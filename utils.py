@@ -1,6 +1,11 @@
 import jax.numpy as jnp
+from flax import nnx
+
 from sklearn.metrics import precision_score, recall_score, f1_score
 from jax.scipy.linalg import inv, cholesky
+
+from model import DAGMM
+
 
 def cosine_similarity(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
     norm_x = jnp.linalg.norm(x, axis=1, keepdims=True)
@@ -31,7 +36,7 @@ def calc_mixture_stats(inputs, gamma, z):
     return phi, mu, covariances
 
 
-def calc_sample_energy(k, z, phi, mu, covs):
+def calc_sample_energies(k, z, phi, mu, covs):
     # broadcast differences
     z_mu = jnp.expand_dims(z, 1) - jnp.expand_dims(mu, 0)  # Shape: (N, K, D)
 
@@ -56,7 +61,7 @@ def calc_sample_energy(k, z, phi, mu, covs):
     E_z = jnp.sum(E_z * z_mu, axis=-1)
     E_z = jnp.exp(-0.5 * E_z)
     E_z = -jnp.log(jnp.sum(jnp.expand_dims(phi, 0) * E_z / cov_dets, axis=1) + eps)
-    return jnp.mean(E_z)
+    return E_z
 
 
 def inference():
@@ -69,3 +74,17 @@ def calc_stats(predicted_labels, labels):
     f1 = f1_score(labels, predicted_labels, average="binary")
 
     return precision, recall, f1
+
+
+def load_checkpoint(model: DAGMM, dir="/tmp/checkpoints/dagmm"):
+    model_state = nnx.state(model)
+    with ocp.CheckpointManager(
+        dir, options=ocp.CheckpointManagerOptions(read_only=True)
+    ) as read_mgr:
+        restored = read_mgr.restore(
+            1,
+            # pass in the model_state to restore the exact same State type
+            args=ocp.args.Composite(state=ocp.args.PyTreeRestore(item=model_state)),
+        )
+    nnx.update(model, restored["state"])
+    return model
