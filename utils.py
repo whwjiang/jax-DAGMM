@@ -63,9 +63,7 @@ def inference():
     pass
 
 
-def calc_stats(membership_probs, labels):
-    predicted_labels = jnp.argmax(membership_probs, axis=1)
-
+def calc_stats(predicted_labels, labels):
     precision = precision_score(labels, predicted_labels, average="binary")
     recall = recall_score(labels, predicted_labels, average="binary")
     f1 = f1_score(labels, predicted_labels, average="binary")

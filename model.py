@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 from flax import nnx
 
-import utils
+from utils import cosine_similarity, euclidean_distance
 
 
 class DAGMM(nnx.Module):
@@ -58,14 +58,10 @@ class DAGMM(nnx.Module):
     def __call__(self, x):
         z_c = self.__encode(x)
         x_hat = self.__decode(z_c)
-        z_r_1 = utils.euclidean_distance(x, x_hat).reshape(-1, 1)
-        # print(f'z_r_1.shape: {z_r_1.shape}')
-        # print(f'z_r_1: {z_r_1}')
-        z_r_2 = utils.cosine_similarity(x, x_hat).reshape(-1, 1)
-        # print(f'z_r_2.shape: {z_r_2.shape}')
-        # print(f'z_r_2: {z_r_2}')
+
+        z_r_1 = euclidean_distance(x, x_hat).reshape(-1, 1)
+        z_r_2 = cosine_similarity(x, x_hat).reshape(-1, 1)
         z = jnp.concat((z_r_1, z_r_2, z_c), axis=1)
-        # print(f'z.shape: {z.shape}')
-        # print(f'z: {z}')
+
         gamma = self.__estimate(z)
         return gamma, x_hat, z
