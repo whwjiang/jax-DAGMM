@@ -4,8 +4,7 @@ from flax import nnx
 import orbax.checkpoint as ocp
 from torch.utils.data import DataLoader
 
-import matplotlib.pyplot as plt
-from IPython.display import clear_output
+from tqdm import tqdm
 
 from model import DAGMM
 from utils import calc_mixture_stats, calc_sample_energies
@@ -64,21 +63,19 @@ def train(model: DAGMM, optimizer: nnx.Optimizer,
     }
     model.train()
 
-    for epoch in range(epochs):
-        _train_epoch(model, optimizer, metrics, dataloader)
-        
-        for metric, value in metrics.compute().items():
-            metrics_history[f'train_{metric}'].append(value)
-        metrics.reset() 
+    with tqdm(total=epochs) as pbar:
+        pbar.set_description("Training")
+        pbar.update(0)
+        for epoch in range(epochs):
+            _train_epoch(model, optimizer, metrics, dataloader)
+            
+            for metric, value in metrics.compute().items():
+                metrics_history[f'train_{metric}'].append(value)
+            metrics.reset()
+            pbar.update(1)
+            loss = metrics_history['train_loss'][-1]
+            pbar.set_postfix({'loss': f'{loss:.2e}'})
 
-        clear_output(wait=True)
-        # Plot loss and accuracy in subplots
-        fig, (ax1) = plt.subplots(1, 1, figsize=(15, 5))
-        ax1.set_title('Loss')
-        ax1.plot(metrics_history['train_loss'], label=f'train_loss')
-        ax1.legend()
-        plt.show()
-        
     if save_model:
         save_checkpoint(model)
         print("Model saved.")

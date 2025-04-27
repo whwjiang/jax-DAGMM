@@ -1,15 +1,13 @@
 import jax.numpy as jnp
-
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import precision_recall_fscore_support as prf
 from jax.scipy.linalg import inv, cholesky
 
 
-
 def cosine_similarity(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-    norm_x = jnp.linalg.norm(x, axis=1, keepdims=True)
-    norm_y = jnp.linalg.norm(y, axis=1, keepdims=True)
-    dot_product = jnp.sum(norm_x * norm_y, axis=1)
-    return dot_product
+    norm_x = jnp.linalg.norm(x, axis=1)
+    norm_y = jnp.linalg.norm(y, axis=1)
+    dot_product = jnp.sum(x * y, axis=1)
+    return dot_product / (norm_x * norm_y)
 
 
 def euclidean_distance(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
@@ -62,15 +60,10 @@ def calc_sample_energies(k, z, phi, mu, covs):
     return E_z
 
 
-# def load_checkpoint(model: DAGMM, dir="/tmp/checkpoints/dagmm"):
-#     model_state = nnx.state(model)
-#     with ocp.CheckpointManager(
-#         dir, options=ocp.CheckpointManagerOptions(read_only=True)
-#     ) as read_mgr:
-#         restored = read_mgr.restore(
-#             1,
-#             # pass in the model_state to restore the exact same State type
-#             args=ocp.args.Composite(state=ocp.args.PyTreeRestore(item=model_state)),
-#         )
-#     nnx.update(model, restored["state"])
-#     return model
+def calc_prf(energy, labels):
+    threshold = jnp.percentile(energy, 100 - 20)
+    print(f'Threshold: {threshold}')
+    y_hat = (energy > threshold).astype(jnp.int32)
+    y_true = labels.astype(jnp.int32)
+    precision, recall, f1, _ = prf(y_true, y_hat, average="binary")
+    return precision, recall, f1

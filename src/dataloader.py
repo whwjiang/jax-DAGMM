@@ -7,7 +7,7 @@ import os
 
 
 class KDDCupData:
-    def __init__(self, key, data_dir, mode, indices_file="./data/indices.npz"):
+    def __init__(self, key, data_dir, mode, indices_file, overwrite=False):
         """Loading the data for train and test."""
         data = jnp.load(data_dir, allow_pickle=True)
 
@@ -17,7 +17,7 @@ class KDDCupData:
         normal_data = features[labels == 0]
         normal_labels = labels[labels == 0]
 
-        if not os.path.exists(indices_file):
+        if overwrite or not os.path.exists(indices_file):
             # Generate and save indices if they don't exist
             n_train = int(normal_data.shape[0] * 0.5)
             ixs = jax.random.permutation(key, normal_data.shape[0])
@@ -45,9 +45,12 @@ class KDDCupData:
         return np.float32(self.x[index]), np.float32(self.y[index])
 
 
-def get_dataloader(key, batch_size, mode, data_dir="./data/kddcup.npz", indices_file="./data/indices.npz"):
+def get_dataloader(key, batch_size, mode, 
+                   data_dir="../data/kddcup.npz", 
+                   indices_file="../data/indices.npz",
+                   overwrite=False):
     """Returning dataloader."""
-    data = KDDCupData(key, data_dir, mode, indices_file=indices_file)
+    data = KDDCupData(key, data_dir, mode, indices_file=indices_file, overwrite=overwrite)
     dataloader = DataLoader(
         data, batch_size=batch_size, shuffle=True, num_workers=0
     )

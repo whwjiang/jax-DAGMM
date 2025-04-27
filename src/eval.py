@@ -1,11 +1,15 @@
 import jax
 import jax.numpy as jnp
 from flax import nnx
+import numpy as np
+import orbax.checkpoint as ocp
+
 from tqdm import tqdm
 
 from model import DAGMM
 from utils import calc_mixture_stats, calc_sample_energies
-from dataloader import cleanup_dataloader
+from dataloader import cleanup_dataloader, get_dataloader
+
 
 @nnx.jit
 def eval_step(model: DAGMM, inputs: jnp.ndarray):
@@ -14,6 +18,7 @@ def eval_step(model: DAGMM, inputs: jnp.ndarray):
     phi, mu, covariances = calc_mixture_stats(inputs, gamma, z)
     energies = calc_sample_energies(model.k, z, phi, mu, covariances)
     return z, energies
+
 
 def eval(model: DAGMM, dataloader_train, dataloader_test):
     """Evaluate the model."""
@@ -29,21 +34,21 @@ def eval(model: DAGMM, dataloader_train, dataloader_test):
         for step, (inputs, labels) in enumerate(dataloader_train):
             inputs = jax.tree.map(lambda x: jnp.array(x), inputs)
             z, energies = eval_step(model, inputs)
-            
+
             combined_z.append(z)
             combined_energy.append(energies)
             combined_labels.append(labels)
             pbar.update(1)
-            
+
     cleanup_dataloader(dataloader_train)
-    
+
     with tqdm(total=len(dataloader_test)) as pbar:
         pbar.set_description("2. Evaluating test data")
         pbar.update(0)
         for step, (inputs, labels) in enumerate(dataloader_test):
             inputs = jax.tree.map(lambda x: jnp.array(x), inputs)
             z, energies = eval_step(model, inputs)
-            
+
             combined_z.append(z)
             combined_energy.append(energies)
             combined_labels.append(labels)
@@ -51,7 +56,33 @@ def eval(model: DAGMM, dataloader_train, dataloader_test):
 
     z = jnp.concatenate(combined_z, axis=0)
     energy = jnp.concatenate(combined_energy, axis=0)
-    labels = jnp.concatenate(combined_labels, axis=0)
-    
+    labels = np.concatenate(combined_labels, axis=0)
+
     cleanup_dataloader(dataloader_test)
-    return z, energy, labels
+    return z, energy, jnp.array(labels)
+
+
+def load_checkpoint(model: DAGMM, dir="/tmp/checkpoints/dagmm"):
+    model_state = nnx.state(model)
+    with ocp.CheckpointManager(
+        dir, options=ocp.CheckpointManagerOptions(read_only=True)
+    ) as read_mgr:
+        restored = read_mgr.restore(
+            1,
+            # pass in the model_state to restore the exact same State type
+            args=ocp.args.Composite(state=ocp.args.PyTreeRestore(item=model_state)),
+        )
+    nnx.update(model, restored["state"])
+
+
+def eval_from_checkpoint():
+    key = jax.random.PRNGKey(42)
+    batch_size = 1024
+    key, dataloader_key = jax.random.split(key, 2)
+
+    model = DAGMM(n_features=118, rngs=nnx.Rngs(key))
+    dataloader_train = get_dataloader(dataloader_key, batch_size=batch_size, mode="train")
+    dataloader_test = get_dataloader(None, batch_size=batch_size, mode="test")
+    load_checkpoint(model)
+
+    return eval(model, dataloader_train, dataloader_test)
