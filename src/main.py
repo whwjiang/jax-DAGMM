@@ -34,7 +34,7 @@ def main():
     train(model, optimizer, metrics, dataloader_train, epochs=200, save_model=True)
     z, energy, labels = eval(model, dataloader_train, dataloader_test)
 
-    jnp.savez("../data/eval.npz", z=z, energy=energy, labels=labels)
+    jnp.savez("../graphs/eval.npz", z=z, energy=energy, labels=labels)
     print(f'Processing done. Use process.ipynb to visualize the results.')
     precision, recall, f1 = calc_prf(energy, labels)
     print(f"Precision: {precision}")
