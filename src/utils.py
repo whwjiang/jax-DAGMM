@@ -1,11 +1,11 @@
 import jax.numpy as jnp
 from sklearn.metrics import precision_recall_fscore_support as prf
-from jax.scipy.linalg import inv, cholesky
+from jax.scipy.linalg import inv, cholesky, det
 
 
 def cosine_similarity(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-    norm_x = jnp.linalg.norm(x, axis=1)
-    norm_y = jnp.linalg.norm(y, axis=1)
+    norm_x = jnp.linalg.norm(x, ord=2, axis=1)
+    norm_y = jnp.linalg.norm(y, ord=2, axis=1)
     dot_product = jnp.sum(x * y, axis=1)
     return dot_product / (norm_x * norm_y)
 
@@ -46,8 +46,9 @@ def calc_sample_energies(k, z, phi, mu, covs):
         cov_inv_i = inv(cov_i)
         cov_invs.append(jnp.expand_dims(cov_inv_i, 0))  # Shape: (1, D, D)
 
-        L = cholesky(cov_i * (2 * jnp.pi), lower=True)
-        cov_det_i = jnp.prod(jnp.diagonal(L)) ** 2
+        #L = cholesky(cov_i * (2 * jnp.pi), lower=True)
+        #cov_det_i = jnp.prod(jnp.diagonal(L)) ** 2
+        cov_det_i = det(cov_i * (2 * jnp.pi)) 
         cov_dets.append(jnp.expand_dims(cov_det_i, 0))  # Shape: (1,)
 
     cov_invs = jnp.concatenate(cov_invs, axis=0)  # Shape: (K, D, D)

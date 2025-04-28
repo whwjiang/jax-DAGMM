@@ -6,6 +6,7 @@ from model import DAGMM
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import mplcursors
+from numpy import random
 
 from utils import calc_prf
 from dataloader import get_dataloader
@@ -16,7 +17,7 @@ from eval import eval
 # Does training and evaluation of the DAGMM model on the KDDCup dataset.
 # Saves the evaluation results to a file.
 def main():
-    key = jax.random.PRNGKey(42)
+    key = jax.random.PRNGKey(random.randint(0, 2**32))
     batch_size = 1024
     key, dataloader_key = jax.random.split(key, 2)
 
@@ -40,6 +41,7 @@ def main():
     print(f"Recall: {recall}")
     print(f"F1: {f1}")
 
+    # Save the plot instead of showing it interactively
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
     sc = ax.scatter(z[:, 2], z[:, 0], z[:, 1], c=labels, cmap="cool", s=1)
@@ -48,7 +50,8 @@ def main():
     ax.set_zlabel("Cosine")
 
     mplcursors.cursor(sc, hover=True)
-    plt.show()
+    plt.savefig("../graphs/eval.png")
+    print("Plot saved to ../graphs/eval.png")
 
 
 if __name__ == "__main__":
