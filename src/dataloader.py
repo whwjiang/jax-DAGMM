@@ -46,8 +46,8 @@ class KDDCupData:
 
 
 def get_dataloader(key, batch_size, mode, 
-                   data_dir="../data/kddcup.npz", 
-                   indices_file="../data/indices.npz",
+                   data_dir="./data/kddcup.npz", 
+                   indices_file="./data/indices.npz",
                    overwrite=False):
     """Returning dataloader."""
     data = KDDCupData(key, data_dir, mode, indices_file=indices_file, overwrite=overwrite)

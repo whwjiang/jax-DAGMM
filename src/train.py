@@ -7,18 +7,18 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model import DAGMM
-from utils import calc_mixture_stats, calc_sample_energies
+from utils import calc_sample_energies
 
 
 def _objective_fn(model: DAGMM, inputs):
     gamma, x_hat, z = model(inputs)
     
-    n = inputs.shape[0]
-    phi, mu, covariances = calc_mixture_stats(inputs, gamma, z)
-    mse = jnp.mean((inputs - x_hat) ** 2)
-    energy = jnp.mean(calc_sample_energies(model.k, z, phi, mu, covariances))
-    reg_1 = (model.lambda_1 / n) * energy
-    reg_2 = model.lambda_2 * (jnp.sum(jnp.diagonal(covariances, axis1=1, axis2=2)) ** -1)
+    phi, mu, covariances = model.calc_mixture_stats(inputs, gamma, z)
+    mse = jnp.mean(jnp.linalg.norm(inputs - x_hat, axis=-1)**2)
+
+    energy = jnp.mean(calc_sample_energies(phi, mu, covariances, z))
+    reg_1 = model.lambda_1 * energy
+    reg_2 = model.lambda_2 * (jnp.sum(jnp.diagonal(covariances, axis1=1, axis2=2) ** -1))
     
     return mse + reg_1 + reg_2
 

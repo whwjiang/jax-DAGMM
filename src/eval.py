@@ -7,7 +7,7 @@ import orbax.checkpoint as ocp
 from tqdm import tqdm
 
 from model import DAGMM
-from utils import calc_mixture_stats, calc_sample_energies
+from utils import calc_sample_energies
 from dataloader import cleanup_dataloader, get_dataloader
 
 
@@ -15,39 +15,66 @@ from dataloader import cleanup_dataloader, get_dataloader
 def eval_step(model: DAGMM, inputs: jnp.ndarray):
     """Evaluate for a single step."""
     gamma, _, z = model(inputs)
-    phi, mu, covariances = calc_mixture_stats(inputs, gamma, z)
-    energies = calc_sample_energies(model.k, z, phi, mu, covariances)
-    return z, energies
+    _, mu, covariances = model.calc_mixture_stats(inputs, gamma, z)
+    return gamma, z, mu, covariances
 
 
 def eval(model: DAGMM, dataloader_train, dataloader_test):
     """Evaluate the model."""
     model.eval()
-
-    combined_z = jax.device_put([])
-    combined_energy = jax.device_put([])
-    combined_labels = []
-
+    
+    N = 0
+    mu_sum = 0
+    cov_sum = 0
+    gamma_sum = 0
+    
+    # first, collect global mixture parameters
     with tqdm(total=len(dataloader_train)) as pbar:
-        pbar.set_description("1. Evaluating training data")
+        pbar.set_description("Collecting mixture params")
         pbar.update(0)
         for step, (inputs, labels) in enumerate(dataloader_train):
             inputs = jax.tree.map(lambda x: jnp.array(x), inputs)
-            z, energies = eval_step(model, inputs)
+            gamma, _, mu, cov = eval_step(model, inputs)
+            
+            batch_gamma_sum = jnp.sum(gamma, axis=0)
+
+            gamma_sum += batch_gamma_sum
+            mu_sum += mu * jnp.expand_dims(batch_gamma_sum, -1)
+            cov_sum += cov * jnp.expand_dims(jnp.expand_dims(batch_gamma_sum, -1), -1)
+            
+            N += inputs.shape[0]
+            pbar.update(1)
+            
+    train_phi = gamma_sum / N
+    train_mu = mu_sum / jnp.expand_dims(gamma_sum, -1)
+    train_cov = cov_sum / jnp.expand_dims(jnp.expand_dims(gamma_sum, -1), -1)
+            
+    combined_z = []
+    combined_energy = []
+    combined_labels = []
+
+    with tqdm(total=len(dataloader_train)) as pbar:
+        pbar.set_description("Evaluating training data")
+        pbar.update(0)
+        for step, (inputs, labels) in enumerate(dataloader_train):
+            inputs = jax.tree.map(lambda x: jnp.array(x), inputs)
+            gamma, z, mu, cov = eval_step(model, inputs)
+            energies = calc_sample_energies(train_phi, train_mu, train_cov, z)
 
             combined_z.append(z)
             combined_energy.append(energies)
             combined_labels.append(labels)
             pbar.update(1)
 
-    cleanup_dataloader(dataloader_train)
+    # cleanup_dataloader(dataloader_train)
 
     with tqdm(total=len(dataloader_test)) as pbar:
-        pbar.set_description("2. Evaluating test data")
+        pbar.set_description("Evaluating test data")
         pbar.update(0)
         for step, (inputs, labels) in enumerate(dataloader_test):
             inputs = jax.tree.map(lambda x: jnp.array(x), inputs)
-            z, energies = eval_step(model, inputs)
+            gamma, z, mu, cov = eval_step(model, inputs)
+            energies = calc_sample_energies(train_phi, train_mu, train_cov, z)
 
             combined_z.append(z)
             combined_energy.append(energies)

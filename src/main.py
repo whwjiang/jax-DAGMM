@@ -17,6 +17,7 @@ from eval import eval
 # Does training and evaluation of the DAGMM model on the KDDCup dataset.
 # Saves the evaluation results to a file.
 def main():
+    # jax.config.update("jax_debug_nans", True)
     key = jax.random.PRNGKey(random.randint(0, 2**32))
     batch_size = 1024
     key, dataloader_key = jax.random.split(key, 2)
@@ -31,10 +32,10 @@ def main():
     optimizer = nnx.Optimizer(model, optax.adam(learning_rate))
     metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
 
-    train(model, optimizer, metrics, dataloader_train, epochs=200, save_model=True)
+    train(model, optimizer, metrics, dataloader_train, epochs=200, save_model=False)
     z, energy, labels = eval(model, dataloader_train, dataloader_test)
 
-    jnp.savez("../graphs/eval.npz", z=z, energy=energy, labels=labels)
+    jnp.savez("./data/eval.npz", z=z, energy=energy, labels=labels)
     print(f'Processing done. Use process.ipynb to visualize the results.')
     precision, recall, f1 = calc_prf(energy, labels)
     print(f"Precision: {precision}")
