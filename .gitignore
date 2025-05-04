@@ -1,5 +1,5 @@
 # Project specific
-data/*
+src/data/*
 .DS_Store
 .vscode/
 
